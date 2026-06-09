@@ -4462,7 +4462,7 @@
             if (isExpanded) {
                 // Expanded view showing all assignments
                 return `
-                    <div style="background: white; border: 2px solid #1f71b8; border-radius: 8px; padding: 18px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="toggleCardExpand(${emp.id}, event)" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+                    <div style="background: white; border: 2px solid #1f71b8; border-radius: 8px; padding: 18px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onclick="openEmployeeProfile(${emp.id})" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
                                 <div style="font-weight: 700; color: #202124; font-size: 16px;">${emp.name}</div>
@@ -4473,7 +4473,7 @@
                             </div>
                         </div>
                         
-                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;" onclick="event.stopPropagation(); toggleCardExpand(${emp.id}, event)">
                             <h4 style="color: #202124; font-size: 13px; margin: 0 0 10px 0;">📍 Primary Assignments</h4>
                             ${primary.length > 0 ? primary.map((assign, idx) => `
                                 <div style="background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
@@ -4490,7 +4490,7 @@
                         </div>
                         
                         ${backup.length > 0 ? `
-                            <div style="margin-top: 12px;">
+                            <div style="margin-top: 12px;" onclick="event.stopPropagation(); toggleCardExpand(${emp.id}, event)">
                                 <h4 style="color: #202124; font-size: 13px; margin: 0 0 10px 0;">🔄 Backup Assignments</h4>
                                 ${backup.map((assign, idx) => `
                                     <div style="background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
@@ -4516,7 +4516,7 @@
             } else {
                 // Collapsed view - original card
                 return `
-                    <div style="background: white; border: 1px solid #dadce0; border-radius: 8px; padding: 18px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" onclick="toggleCardExpand(${emp.id}, event)" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'; this.style.transform=''">
+                    <div style="background: white; border: 1px solid #dadce0; border-radius: 8px; padding: 18px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" onclick="openEmployeeProfile(${emp.id})" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'; this.style.transform=''">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
                                 <div style="font-weight: 700; color: #202124; font-size: 16px;">${emp.name}</div>
@@ -4527,7 +4527,7 @@
                             </div>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
-                            <div>
+                            <div style="cursor: pointer; position: relative;" onclick="event.stopPropagation(); toggleCardExpand(${emp.id}, event)">
                                 <div style="font-size: 11px; color: #9aa0a6; text-transform: uppercase;">Primary</div>
                                 <div style="font-weight: 600; color: #202124; margin-top: 2px; font-size: 13px; display: flex; align-items: center; gap: 6px;">
                                     ${(() => {
@@ -4537,6 +4537,9 @@
                                         return primary.length > 1 ? `<span style="font-size: 10px; background: #1f71b8; color: white; padding: 2px 6px; border-radius: 3px;">+${primary.length - 1}</span>` : '';
                                     })()}
                                 </div>
+                                ${(() => {
+                                    return primary.length > 1 ? `<div style="font-size: 10px; color: #5f6368; margin-top: 4px;">Click to expand ▼</div>` : '';
+                                })()}
                             </div>
                             <div>
                                 <div style="font-size: 11px; color: #9aa0a6; text-transform: uppercase;">Trade</div>
