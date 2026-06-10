@@ -2618,7 +2618,7 @@
                         return;
                     }
                 }
-                request.status = 'approved';
+                request.status = 'Approved';
                 request.approvedDate = new Date().toISOString();
                 request.approvedBy = currentUser ? currentUser.id : null;
                 request.approvedByName = currentUser ? currentUser.name : 'Unknown';
@@ -2632,7 +2632,7 @@
             const reason = prompt('Enter reason for denial (optional):');
             const request = requests.find(r => r.id === id);
             if (request) {
-                request.status = 'denied';
+                request.status = 'Denied';
                 request.deniedDate = new Date().toISOString();
                 request.deniedBy = currentUser ? currentUser.id : null;
                 request.denialReason = reason;
@@ -4328,6 +4328,9 @@
         }
 
         function renderMainDispatchDashboard() {
+            // Reload requests from localStorage to get latest PTO approvals
+            requests = JSON.parse(localStorage.getItem('requests')) || [];
+            
             initializeDispatchData();
             initializeOnCall();
             initializeHousePager();
