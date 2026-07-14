@@ -732,6 +732,7 @@
             </div>
         </div>
         <div class="header-right">
+            <div id="syncBadge" style="font-size: 12px; color: var(--gray-600);"></div>
             <div class="user-info">
                 <div class="user-name" id="currentUserName">Loading...</div>
                 <div class="user-role" id="currentUserRole"></div>
@@ -999,6 +1000,25 @@
     <!-- Modals will be injected here -->
     <div id="modalsContainer"></div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script>
+        // ============================================================
+        // FIREBASE CONFIG — PASTE YOURS HERE
+        // Firebase Console → Project Settings → General → Your apps →
+        // Web app → SDK setup and configuration → Config
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "PASTE_YOUR_API_KEY",
+            authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+            projectId: "PASTE_YOUR_PROJECT_ID",
+            storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+            messagingSenderId: "PASTE_YOUR_SENDER_ID",
+            appId: "PASTE_YOUR_APP_ID"
+        };
+    </script>
+
     <script>
         // ===== CORE DATA =====
         const defaultUsers = [
@@ -1025,10 +1045,146 @@
         let dispatchEmployees = [];
         let expandedCardId = null;
 
+        // ===== CLOUD SYNC (Firestore) =====
+        const SYNC_KEYS = ['users', 'requests', 'dispatchData', 'buildings', 'trades', 'onSitePagers', 'afterHoursOnCall', 'onSitePagerTrades', 'afterHoursOnCallTrades'];
+        let db = null;
+        let cloudReady = false;
+        let initialSyncDone = false;
+
+        function getGlobal(key) {
+            switch (key) {
+                case 'users': return users;
+                case 'requests': return requests;
+                case 'dispatchData': return dispatchData;
+                case 'buildings': return buildings;
+                case 'trades': return trades;
+                case 'onSitePagers': return onSitePagers;
+                case 'afterHoursOnCall': return afterHoursOnCall;
+                case 'onSitePagerTrades': return onSitePagerTrades;
+                case 'afterHoursOnCallTrades': return afterHoursOnCallTrades;
+            }
+        }
+
+        function setGlobal(key, v) {
+            switch (key) {
+                case 'users': users = v; break;
+                case 'requests': requests = v; break;
+                case 'dispatchData': dispatchData = v; break;
+                case 'buildings': buildings = v; break;
+                case 'trades': trades = v; break;
+                case 'onSitePagers': onSitePagers = v; break;
+                case 'afterHoursOnCall': afterHoursOnCall = v; break;
+                case 'onSitePagerTrades': onSitePagerTrades = v; break;
+                case 'afterHoursOnCallTrades': afterHoursOnCallTrades = v; break;
+            }
+        }
+
+        // Central save: updates local mirror AND pushes to cloud
+        function saveData(key, value) {
+            setGlobal(key, value);
+            localStorage.setItem(key, JSON.stringify(value));
+            if (cloudReady) {
+                db.collection('jaxData').doc(key).set({
+                    value: JSON.stringify(value),
+                    updatedAt: Date.now(),
+                    updatedBy: currentUser ? currentUser.name : 'unknown'
+                }).catch(err => {
+                    console.error('Cloud save failed for ' + key, err);
+                    updateSyncBadge('error');
+                });
+            }
+        }
+
+        function applyCloudValue(key, value) {
+            const current = JSON.stringify(getGlobal(key));
+            const incoming = JSON.stringify(value);
+            if (current === incoming) return false;
+            setGlobal(key, value);
+            localStorage.setItem(key, incoming);
+            return true;
+        }
+
+        function startCloudSync() {
+            if (typeof firebase === 'undefined' || !firebaseConfig || firebaseConfig.apiKey.startsWith('PASTE_')) {
+                console.warn('Firebase not configured — running in local-only mode.');
+                updateSyncBadge('local');
+                return;
+            }
+
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                cloudReady = true;
+            } catch (e) {
+                console.error('Firebase init failed:', e);
+                updateSyncBadge('error');
+                return;
+            }
+
+            db.collection('jaxData').onSnapshot(snap => {
+                let changed = false;
+                const seenKeys = new Set();
+
+                snap.forEach(doc => {
+                    seenKeys.add(doc.id);
+                    try {
+                        const value = JSON.parse(doc.data().value);
+                        if (applyCloudValue(doc.id, value)) changed = true;
+                    } catch (e) {
+                        console.error('Failed to parse cloud data for ' + doc.id, e);
+                    }
+                });
+
+                // First snapshot: push any local data the cloud doesn't have yet (one-time migration)
+                if (!initialSyncDone) {
+                    initialSyncDone = true;
+                    SYNC_KEYS.forEach(key => {
+                        if (!seenKeys.has(key)) {
+                            const localValue = getGlobal(key);
+                            db.collection('jaxData').doc(key).set({
+                                value: JSON.stringify(localValue),
+                                updatedAt: Date.now(),
+                                updatedBy: 'migration'
+                            });
+                        }
+                    });
+                }
+
+                if (changed && currentUser) {
+                    refreshCurrentView();
+                }
+                updateSyncBadge('online');
+            }, err => {
+                console.error('Cloud sync error:', err);
+                updateSyncBadge('error');
+            });
+        }
+
+        function refreshCurrentView() {
+            const active = document.querySelector('.section.active');
+            if (!active) return;
+            if (active.id === 'dispatchSection') renderMainDispatchDashboard();
+            else if (active.id === 'requestsSection') renderRequests();
+            else if (active.id === 'usersSection') renderUsersList();
+        }
+
+        function updateSyncBadge(state) {
+            const badge = document.getElementById('syncBadge');
+            if (!badge) return;
+            const states = {
+                'online': { dot: '#34a853', text: 'Live' },
+                'local': { dot: '#9aa0a6', text: 'Local only' },
+                'error': { dot: '#ea4335', text: 'Sync error' }
+            };
+            const s = states[state] || states['local'];
+            badge.innerHTML = `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${s.dot}; margin-right: 6px;"></span>${s.text}`;
+        }
+
         // ===== INITIALIZATION =====
         document.addEventListener('DOMContentLoaded', () => {
             loadBuildings();
             loadTrades();
+            startCloudSync();
             if (!currentUser) {
                 showLoginScreen();
             } else {
@@ -1082,7 +1238,7 @@
             }
 
             user.employeeId = newPassword;
-            localStorage.setItem('users', JSON.stringify(users));
+            saveData('users', users);
 
             errorBox.style.display = 'none';
             showLoginForm();
@@ -1497,7 +1653,7 @@
         }
 
         function saveBuildingsData() {
-            localStorage.setItem('buildings', JSON.stringify(buildings));
+            saveData('buildings', buildings);
         }
 
         function openBuildingsModal() {
@@ -1573,7 +1729,7 @@
         }
 
         function saveTradesData() {
-            localStorage.setItem('trades', JSON.stringify(trades));
+            saveData('trades', trades);
         }
 
         function openTradesModal() {
@@ -1736,7 +1892,7 @@
             }
             collectPagerEditValues();
             config.tradeList.push(name);
-            localStorage.setItem(config.tradesKey, JSON.stringify(config.tradeList));
+            saveData(config.tradesKey, config.tradeList);
             renderPagerEdit();
         }
 
@@ -1747,8 +1903,8 @@
             const idx = config.tradeList.indexOf(trade);
             if (idx > -1) config.tradeList.splice(idx, 1);
             delete config.data[trade];
-            localStorage.setItem(config.tradesKey, JSON.stringify(config.tradeList));
-            localStorage.setItem(config.storageKey, JSON.stringify(config.data));
+            saveData(config.tradesKey, config.tradeList);
+            saveData(config.storageKey, config.data);
             renderPagerEdit();
         }
 
@@ -1768,7 +1924,7 @@
                 };
             });
 
-            localStorage.setItem(config.storageKey, JSON.stringify(config.data));
+            saveData(config.storageKey, config.data);
             renderPagerView();
             updateTeamStats();
         }
@@ -2037,8 +2193,8 @@
                 backupFloor: backupAssignments[0]?.floor || ''
             };
 
-            localStorage.setItem('users', JSON.stringify(users));
-            localStorage.setItem('dispatchData', JSON.stringify(dispatchData));
+            saveData('users', users);
+            saveData('dispatchData', dispatchData);
 
             closeMemberModal();
             renderMainDispatchDashboard();
@@ -2053,8 +2209,8 @@
 
             users = users.filter(u => u.id !== userId);
             delete dispatchData[userId];
-            localStorage.setItem('users', JSON.stringify(users));
-            localStorage.setItem('dispatchData', JSON.stringify(dispatchData));
+            saveData('users', users);
+            saveData('dispatchData', dispatchData);
 
             renderMainDispatchDashboard();
             renderUsersList();
