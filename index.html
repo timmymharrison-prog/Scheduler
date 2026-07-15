@@ -755,25 +755,33 @@
                     <p style="color: var(--gray-600); font-size: 14px;">Real-time overview of your workforce</p>
                 </div>
 
-                <!-- Stats -->
-                <div class="stats-grid" id="teamStatsContainer"></div>
+                <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+                    <!-- Main column -->
+                    <div style="flex: 1; min-width: 300px;">
+                        <!-- Stats -->
+                        <div id="teamStatsContainer"></div>
 
-                <!-- Search & Filters -->
-                <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search by name..." id="mainDispatchSearchInput" onkeyup="filterMainDispatchEmployees()">
-                    <select class="form-select" id="filterBuilding" onchange="updateFloorFilter(); filterMainDispatchEmployees()">
-                        <option value="">All Buildings</option>
-                    </select>
-                    <select class="form-select" id="filterFloor" onchange="filterMainDispatchEmployees()">
-                        <option value="">All Floors</option>
-                    </select>
-                    <select class="form-select" id="filterTrade" onchange="filterMainDispatchEmployees()">
-                        <option value="">All Trades</option>
-                    </select>
+                        <!-- Search & Filters -->
+                        <div class="search-bar">
+                            <input type="text" class="search-input" placeholder="Search by name..." id="mainDispatchSearchInput" onkeyup="filterMainDispatchEmployees()">
+                            <select class="form-select" id="filterBuilding" onchange="updateFloorFilter(); filterMainDispatchEmployees()">
+                                <option value="">All Buildings</option>
+                            </select>
+                            <select class="form-select" id="filterFloor" onchange="filterMainDispatchEmployees()">
+                                <option value="">All Floors</option>
+                            </select>
+                            <select class="form-select" id="filterTrade" onchange="filterMainDispatchEmployees()">
+                                <option value="">All Trades</option>
+                            </select>
+                        </div>
+
+                        <!-- Employee List -->
+                        <div id="mainDispatchEmployeesList"></div>
+                    </div>
+
+                    <!-- Groups panel (right side) -->
+                    <div id="groupsPanel" style="width: 280px; flex-shrink: 0;"></div>
                 </div>
-
-                <!-- Employee List -->
-                <div id="mainDispatchEmployeesList"></div>
             </div>
 
             <!-- Requests Section -->
@@ -819,6 +827,11 @@
             <div class="menu-section" id="buildingsManagementSection" style="display: none;">
                 <div class="menu-section-title">Workspace</div>
                 <div class="menu-item" onclick="toggleMenu(); openBuildingsModal()">🏢 Buildings & Floors</div>
+            </div>
+            <div class="menu-section" id="groupsManagementSection" style="display: none;">
+                <div class="menu-section-title">Team</div>
+                <div class="menu-item" id="usersMenuItem" onclick="toggleMenu(); switchTab('users')">🧑‍💼 Users</div>
+                <div class="menu-item" onclick="toggleMenu(); openGroupsModal()">👥 Groups</div>
             </div>
             <div class="menu-section" id="tradesManagementSection" style="display: none;">
                 <div class="menu-section-title">Operations</div>
@@ -871,6 +884,17 @@
                         <label class="form-label">Employee ID (used as login password)</label>
                         <input type="text" class="form-input" id="memberEmployeeId" placeholder="e.g. EMP-1042">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Group</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select class="form-select" id="memberGroup" style="flex: 1;"></select>
+                            <button class="btn btn-secondary btn-small" type="button" onclick="newGroupPrompt()">+ New</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 28px;">
+                        <input type="checkbox" id="memberShowOnBoard" checked style="width: 16px; height: 16px;">
+                        <label class="form-label" for="memberShowOnBoard" style="margin-bottom: 0; cursor: pointer;">Show on Team Status employee list</label>
+                    </div>
                 </div>
 
                 <!-- Schedule -->
@@ -910,19 +934,27 @@
                     </div>
                 </div>
 
-                <!-- Primary Assignments -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px 0;">
-                    <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase;">Primary Assignments</div>
-                    <button class="btn btn-secondary btn-small" onclick="addAssignmentRow('primary')">+ Add</button>
+                <!-- No Building Assignment toggle -->
+                <div style="display: flex; align-items: center; gap: 8px; margin: 24px 0 8px 0; padding: 12px 14px; background: var(--gray-50); border-radius: 6px;">
+                    <input type="checkbox" id="memberNoAssignment" onchange="toggleNoAssignment()" style="width: 16px; height: 16px; cursor: pointer;">
+                    <label class="form-label" for="memberNoAssignment" style="margin-bottom: 0; cursor: pointer;">No building assignment (floating / unassigned)</label>
                 </div>
-                <div id="primaryAssignmentsRows"></div>
 
-                <!-- Backup Assignments -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px 0;">
-                    <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase;">Backup Assignments</div>
-                    <button class="btn btn-secondary btn-small" onclick="addAssignmentRow('backup')">+ Add</button>
+                <div id="assignmentSections">
+                    <!-- Primary Assignments -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px 0;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase;">Primary Assignments</div>
+                        <button class="btn btn-secondary btn-small" onclick="addAssignmentRow('primary')">+ Add</button>
+                    </div>
+                    <div id="primaryAssignmentsRows"></div>
+
+                    <!-- Backup Assignments -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 16px 0;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase;">Backup Assignments</div>
+                        <button class="btn btn-secondary btn-small" onclick="addAssignmentRow('backup')">+ Add</button>
+                    </div>
+                    <div id="backupAssignmentsRows"></div>
                 </div>
-                <div id="backupAssignmentsRows"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeMemberModal()">Cancel</button>
@@ -947,6 +979,26 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('buildingsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Groups Management Modal -->
+    <div class="modal" id="groupsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Manage Groups</span>
+                <button class="modal-close" onclick="closeModal('groupsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                    <input type="text" class="form-input" id="newGroupNameInput" placeholder="New group name..." onkeydown="if(event.key==='Enter') addGroupFromModal()">
+                    <button class="btn btn-primary" onclick="addGroupFromModal()">Add</button>
+                </div>
+                <div id="groupsManageList"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('groupsModal')">Close</button>
             </div>
         </div>
     </div>
@@ -1041,13 +1093,14 @@
             { name: 'Denver HQ', description: 'Main office', floors: ['1st Floor', '2nd Floor', '3rd Floor'] }
         ];
         let trades = JSON.parse(localStorage.getItem('trades')) || ['General', 'Electrician', 'Plumber', 'HVAC', 'Carpenter'];
+        let groups = JSON.parse(localStorage.getItem('groups')) || [];
         let onSitePagers = JSON.parse(localStorage.getItem('onSitePagers')) || {};
         let afterHoursOnCall = JSON.parse(localStorage.getItem('afterHoursOnCall')) || {};
         let dispatchEmployees = [];
         let expandedCardId = null;
 
         // ===== CLOUD SYNC (Firestore) =====
-        const SYNC_KEYS = ['users', 'requests', 'dispatchData', 'buildings', 'trades', 'onSitePagers', 'afterHoursOnCall', 'onSitePagerTrades', 'afterHoursOnCallTrades'];
+        const SYNC_KEYS = ['users', 'requests', 'dispatchData', 'buildings', 'trades', 'groups', 'onSitePagers', 'afterHoursOnCall', 'onSitePagerTrades', 'afterHoursOnCallTrades'];
         let db = null;
         let cloudReady = false;
         let initialSyncDone = false;
@@ -1059,6 +1112,7 @@
                 case 'dispatchData': return dispatchData;
                 case 'buildings': return buildings;
                 case 'trades': return trades;
+                case 'groups': return groups;
                 case 'onSitePagers': return onSitePagers;
                 case 'afterHoursOnCall': return afterHoursOnCall;
                 case 'onSitePagerTrades': return onSitePagerTrades;
@@ -1073,6 +1127,7 @@
                 case 'dispatchData': dispatchData = v; break;
                 case 'buildings': buildings = v; break;
                 case 'trades': trades = v; break;
+                case 'groups': groups = v; break;
                 case 'onSitePagers': onSitePagers = v; break;
                 case 'afterHoursOnCall': afterHoursOnCall = v; break;
                 case 'onSitePagerTrades': onSitePagerTrades = v; break;
@@ -1361,6 +1416,245 @@
             populateBuildingFilter();
             populateTradeFilter();
             filterMainDispatchEmployees();
+            renderGroupsPanel();
+        }
+
+        // ===== GROUPS =====
+        let activeGroupFilter = null;
+
+        function renderGroupsPanel() {
+            const panel = document.getElementById('groupsPanel');
+            if (!panel) return;
+
+            if (groups.length === 0) {
+                panel.innerHTML = `
+                    <div style="background: white; border: 1px solid var(--gray-300); border-radius: 8px; padding: 20px;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase; margin-bottom: 8px;">Groups</div>
+                        <div style="font-size: 13px; color: var(--gray-600);">No groups yet. Assign one from any team member's profile.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const statusDot = (status) => {
+                const color = status === 'working' ? 'var(--success)' : status === 'pto' ? 'var(--warning)' : 'var(--error)';
+                return `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${color}; margin-right: 8px; flex-shrink: 0;"></span>`;
+            };
+
+            panel.innerHTML = `
+                <div style="background: white; border: 1px solid var(--gray-300); border-radius: 8px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--gray-600); text-transform: uppercase;">Groups</div>
+                        ${activeGroupFilter ? `<button class="btn btn-secondary btn-small" onclick="setGroupFilter(null)">Clear filter</button>` : ''}
+                    </div>
+                    ${groups.map(g => {
+                        const members = dispatchEmployees.filter(e => e.group === g);
+                        const isActive = activeGroupFilter === g;
+                        return `
+                            <div style="margin-bottom: 14px;">
+                                <div onclick="setGroupFilter('${g.replace(/'/g, "\\'")}')" style="cursor: pointer; font-weight: 600; font-size: 14px; padding: 8px 10px; border-radius: 6px; background: ${isActive ? 'var(--primary)' : 'var(--gray-50)'}; color: ${isActive ? 'white' : 'var(--gray-900)'}; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>${g}</span>
+                                    <span style="font-size: 12px; opacity: 0.8;">${members.length}</span>
+                                </div>
+                                ${members.map(m => `
+                                    <div onclick="openMemberModal(${m.id})" style="display: flex; align-items: center; padding: 6px 10px; font-size: 13px; cursor: pointer; color: var(--gray-700); border-radius: 4px;" onmouseover="this.style.background='var(--gray-100)'" onmouseout="this.style.background=''">
+                                        ${statusDot(m.status)}${m.name}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        function setGroupFilter(groupName) {
+            activeGroupFilter = activeGroupFilter === groupName ? null : groupName;
+            filterMainDispatchEmployees();
+            renderGroupsPanel();
+        }
+
+        function newGroupPrompt() {
+            const name = prompt('New group name:');
+            if (!name || !name.trim()) return;
+            const trimmed = name.trim();
+            if (groups.includes(trimmed)) {
+                alert('That group already exists.');
+            } else {
+                groups.push(trimmed);
+                saveData('groups', groups);
+            }
+            populateGroupDropdown(trimmed);
+        }
+
+        function populateGroupDropdown(selected) {
+            const select = document.getElementById('memberGroup');
+            if (!select) return;
+            select.innerHTML = '<option value="">None</option>' +
+                groups.map(g => `<option value="${g}" ${g === selected ? 'selected' : ''}>${g}</option>`).join('');
+        }
+
+        // ===== GROUPS MANAGEMENT MODAL =====
+        let openGroupName = null;
+
+        function openGroupsModal() {
+            openGroupName = null;
+            renderGroupsManageList();
+            document.getElementById('groupsModal').classList.add('active');
+        }
+
+        function renderGroupsManageList() {
+            const container = document.getElementById('groupsManageList');
+            if (!container) return;
+
+            if (groups.length === 0) {
+                container.innerHTML = '<div style="color: var(--gray-600); font-style: italic; text-align: center; padding: 20px;">No groups yet. Add one above.</div>';
+                return;
+            }
+
+            container.innerHTML = groups.map(g => {
+                const isOpen = openGroupName === g;
+                const members = users.filter(u => (dispatchData[u.id] || {}).group === g);
+                const nonMembers = users.filter(u => (dispatchData[u.id] || {}).group !== g);
+                const escaped = g.replace(/'/g, "\\'");
+
+                return `
+                    <div style="border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
+                        <div onclick="toggleGroupOpen('${escaped}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; background: ${isOpen ? 'var(--gray-50)' : 'white'};">
+                            <div style="font-weight: 600;">${g} <span style="font-weight: 400; color: var(--gray-600); font-size: 13px;">(${members.length})</span></div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); renameGroup('${escaped}')">Edit</button>
+                                <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); deleteGroupFromModal('${escaped}')">Delete</button>
+                                <span style="color: var(--gray-600);">${isOpen ? '▲' : '▼'}</span>
+                            </div>
+                        </div>
+                        ${isOpen ? `
+                            <div style="padding: 16px; border-top: 1px solid var(--gray-300);">
+                                <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                                    <select class="form-select" id="addToGroupSelect" style="flex: 1;">
+                                        <option value="">Select a team member...</option>
+                                        ${nonMembers.map(u => `<option value="${u.id}">${u.name}</option>`).join('')}
+                                    </select>
+                                    <button class="btn btn-primary btn-small" onclick="addMemberToGroup('${escaped}')">Add</button>
+                                </div>
+                                ${members.length > 0 ? members.map(u => {
+                                    const visible = (dispatchData[u.id] || {}).showOnTeamStatus !== false;
+                                    return `
+                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--gray-50); border-radius: 6px; margin-bottom: 6px;">
+                                        <span style="font-size: 14px; ${visible ? '' : 'color: var(--gray-600);'}">${u.name}</span>
+                                        <div style="display: flex; align-items: center; gap: 14px;">
+                                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gray-600); cursor: pointer; white-space: nowrap;">
+                                                <input type="checkbox" ${visible ? 'checked' : ''} onchange="toggleMemberVisibility(${u.id})" style="width: 14px; height: 14px; cursor: pointer;">
+                                                Show on list
+                                            </label>
+                                            <button class="btn btn-secondary btn-small" onclick="removeMemberFromGroup(${u.id})">✕</button>
+                                        </div>
+                                    </div>
+                                `;}).join('') : '<div style="color: var(--gray-600); font-style: italic; font-size: 13px;">No members in this group yet.</div>'}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleGroupOpen(name) {
+            openGroupName = openGroupName === name ? null : name;
+            renderGroupsManageList();
+        }
+
+        function addGroupFromModal() {
+            const input = document.getElementById('newGroupNameInput');
+            const name = input.value.trim();
+            if (!name) return;
+            if (groups.includes(name)) {
+                alert('That group already exists.');
+                return;
+            }
+            groups.push(name);
+            saveData('groups', groups);
+            input.value = '';
+            openGroupName = name;
+            renderGroupsManageList();
+            renderGroupsPanel();
+        }
+
+        function renameGroup(oldName) {
+            const input = prompt('Rename group:', oldName);
+            if (input === null) return; // cancelled
+            const newName = input.trim();
+            if (!newName || newName === oldName) return;
+            if (groups.includes(newName)) {
+                alert('A group with that name already exists.');
+                return;
+            }
+
+            // Rename in the groups list
+            const idx = groups.indexOf(oldName);
+            if (idx > -1) groups[idx] = newName;
+
+            // Migrate all members to the new name
+            Object.keys(dispatchData).forEach(uid => {
+                if (dispatchData[uid].group === oldName) {
+                    dispatchData[uid].group = newName;
+                }
+            });
+
+            if (openGroupName === oldName) openGroupName = newName;
+            if (activeGroupFilter === oldName) activeGroupFilter = newName;
+
+            saveData('groups', groups);
+            saveData('dispatchData', dispatchData);
+            renderGroupsManageList();
+            renderMainDispatchDashboard();
+        }
+
+        function deleteGroupFromModal(name) {
+            const memberCount = users.filter(u => (dispatchData[u.id] || {}).group === name).length;
+            if (!confirm(`Delete the "${name}" group?${memberCount > 0 ? ` Its ${memberCount} member(s) will be unassigned.` : ''}`)) return;
+
+            groups = groups.filter(g => g !== name);
+            // Unassign members of the deleted group
+            Object.keys(dispatchData).forEach(uid => {
+                if (dispatchData[uid].group === name) {
+                    dispatchData[uid].group = '';
+                }
+            });
+            saveData('groups', groups);
+            saveData('dispatchData', dispatchData);
+            if (openGroupName === name) openGroupName = null;
+            renderGroupsManageList();
+            renderMainDispatchDashboard();
+        }
+
+        function addMemberToGroup(groupName) {
+            const select = document.getElementById('addToGroupSelect');
+            const userId = parseInt(select.value);
+            if (!userId) return;
+
+            if (!dispatchData[userId]) dispatchData[userId] = {};
+            dispatchData[userId].group = groupName;
+            saveData('dispatchData', dispatchData);
+            renderGroupsManageList();
+            renderMainDispatchDashboard();
+        }
+
+        function toggleMemberVisibility(userId) {
+            if (!dispatchData[userId]) dispatchData[userId] = {};
+            const current = dispatchData[userId].showOnTeamStatus !== false;
+            dispatchData[userId].showOnTeamStatus = !current;
+            saveData('dispatchData', dispatchData);
+            renderGroupsManageList();
+            renderMainDispatchDashboard();
+        }
+
+        function removeMemberFromGroup(userId) {
+            if (dispatchData[userId]) {
+                dispatchData[userId].group = '';
+                saveData('dispatchData', dispatchData);
+            }
+            renderGroupsManageList();
+            renderMainDispatchDashboard();
         }
 
         function timeToMinutes(t) {
@@ -1448,35 +1742,40 @@
                 emp.status = calculateEmployeeStatus(emp.id);
             });
 
-            const working = dispatchEmployees.filter(e => e.status === 'working').length;
-            const pto = dispatchEmployees.filter(e => e.status === 'pto').length;
-            const offShift = dispatchEmployees.filter(e => e.status === 'off-shift').length;
+            const visible = dispatchEmployees.filter(e => e.showOnTeamStatus !== false);
+            const working = visible.filter(e => e.status === 'working').length;
+            const pto = visible.filter(e => e.status === 'pto').length;
+            const offShift = visible.filter(e => e.status === 'off-shift').length;
 
             const container = document.getElementById('teamStatsContainer');
             const onSiteCount = onSitePagerTrades.filter(t => onSitePagers[t] && onSitePagers[t].userId).length;
             const onCallCount = afterHoursOnCallTrades.filter(t => afterHoursOnCall[t] && afterHoursOnCall[t].userId).length;
 
             container.innerHTML = `
-                <div class="stat-card" onclick="openStatusModal('working')">
-                    <div class="stat-number" style="color: var(--success);">${working}</div>
-                    <div class="stat-label">Working</div>
+                <div class="stats-grid">
+                    <div class="stat-card" onclick="openStatusModal('working')">
+                        <div class="stat-number" style="color: var(--success);">${working}</div>
+                        <div class="stat-label">Working</div>
+                    </div>
+                    <div class="stat-card" onclick="openStatusModal('pto')">
+                        <div class="stat-number" style="color: var(--warning);">${pto}</div>
+                        <div class="stat-label">Off Duty</div>
+                        <div style="font-size: 11px; color: var(--gray-600); margin-top: 2px;">(PTO, UPTO, HFWA, FMLA)</div>
+                    </div>
+                    <div class="stat-card" onclick="openStatusModal('off-shift')">
+                        <div class="stat-number" style="color: var(--error);">${offShift}</div>
+                        <div class="stat-label">Off Shift</div>
+                    </div>
                 </div>
-                <div class="stat-card" onclick="openStatusModal('pto')">
-                    <div class="stat-number" style="color: var(--warning);">${pto}</div>
-                    <div class="stat-label">Off Duty</div>
-                    <div style="font-size: 11px; color: var(--gray-600); margin-top: 2px;">(PTO, UPTO, HFWA, FMLA)</div>
-                </div>
-                <div class="stat-card" onclick="openStatusModal('off-shift')">
-                    <div class="stat-number" style="color: var(--error);">${offShift}</div>
-                    <div class="stat-label">Off Shift</div>
-                </div>
-                <div class="pager-card" style="background: linear-gradient(135deg, #1f71b8, #155a96);" onclick="openPagerModal('onsite')">
-                    <div class="pager-card-label">On-Site Pager</div>
-                    <div class="pager-card-value">${onSiteCount} of ${onSitePagerTrades.length} assigned</div>
-                </div>
-                <div class="pager-card" style="background: linear-gradient(135deg, #34a853, #2d8659);" onclick="openPagerModal('afterhours')">
-                    <div class="pager-card-label">After-Hours On-Call</div>
-                    <div class="pager-card-value">${onCallCount} of ${afterHoursOnCallTrades.length} assigned</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px;">
+                    <div class="pager-card" style="background: linear-gradient(135deg, #1f71b8, #155a96);" onclick="openPagerModal('onsite')">
+                        <div class="pager-card-label">On-Site Pager</div>
+                        <div class="pager-card-value">${onSiteCount} of ${onSitePagerTrades.length} assigned</div>
+                    </div>
+                    <div class="pager-card" style="background: linear-gradient(135deg, #34a853, #2d8659);" onclick="openPagerModal('afterhours')">
+                        <div class="pager-card-label">After-Hours On-Call</div>
+                        <div class="pager-card-value">${onCallCount} of ${afterHoursOnCallTrades.length} assigned</div>
+                    </div>
                 </div>
             `;
         }
@@ -1557,6 +1856,12 @@
             });
 
             let filtered = dispatchEmployees.filter(emp => {
+                // Respect the "Show on Team Status employee list" toggle
+                if (emp.showOnTeamStatus === false) return false;
+
+                // Group panel filter
+                if (activeGroupFilter && emp.group !== activeGroupFilter) return false;
+
                 const matchesSearch = !searchTerm || emp.name.toLowerCase().includes(searchTerm);
 
                 let matchesBuilding = !buildingFilter;
@@ -1603,7 +1908,7 @@
                     <div class="employee-meta">
                         <div class="meta-item">
                             <div class="meta-label">Assignment</div>
-                            <div class="meta-value">${primary.length > 0 ? primary[0].building + (primary[0].floor ? ' - ' + primary[0].floor : '') : 'TBD'}</div>
+                            <div class="meta-value">${emp.noBuildingAssignment ? '<span style="color: var(--gray-600); font-style: italic;">No Assignment</span>' : (primary.length > 0 ? primary[0].building + (primary[0].floor ? ' - ' + primary[0].floor : '') : 'TBD')}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Trade</div>
@@ -1625,7 +1930,7 @@
             dispatchEmployees.forEach(emp => {
                 emp.status = calculateEmployeeStatus(emp.id);
             });
-            const matching = dispatchEmployees.filter(e => e.status === status);
+            const matching = dispatchEmployees.filter(e => e.status === status && e.showOnTeamStatus !== false);
 
             const body = document.getElementById('statusModalBody');
             if (matching.length === 0) {
@@ -1995,6 +2300,7 @@
             
             const canManageBuildings = currentUser && (currentUser.role === 'Admin' || currentUser.role === 'Supervisor');
             document.getElementById('buildingsManagementSection').style.display = canManageBuildings ? 'block' : 'none';
+            document.getElementById('groupsManagementSection').style.display = canManageBuildings ? 'block' : 'none';
             
             const canManageTrades = currentUser && currentUser.role === 'Admin';
             document.getElementById('tradesManagementSection').style.display = canManageTrades ? 'block' : 'none';
@@ -2015,6 +2321,11 @@
 
         // ===== MEMBER MANAGEMENT =====
         let editingMemberId = null;
+
+        function toggleNoAssignment() {
+            const checked = document.getElementById('memberNoAssignment').checked;
+            document.getElementById('assignmentSections').style.display = checked ? 'none' : 'block';
+        }
 
         function openMemberModal(memberId = null) {
             editingMemberId = memberId;
@@ -2045,6 +2356,10 @@
                 document.getElementById('memberRole').value = user.role || 'User';
                 document.getElementById('memberEmployeeId').value = user.employeeId || '';
                 document.getElementById('memberTrade').value = profile.trade || 'General';
+                populateGroupDropdown(profile.group || '');
+                document.getElementById('memberShowOnBoard').checked = profile.showOnTeamStatus !== false;
+                document.getElementById('memberNoAssignment').checked = profile.noBuildingAssignment === true;
+                toggleNoAssignment();
                 document.getElementById('memberScheduleStart').value = profile.scheduleStart || 'Monday';
                 document.getElementById('memberScheduleEnd').value = profile.scheduleEnd || 'Friday';
                 document.getElementById('memberTimeStart').value = profile.scheduleTimeStart || '06:00';
@@ -2064,6 +2379,10 @@
                 document.getElementById('memberEmail').value = '';
                 document.getElementById('memberRole').value = 'User';
                 document.getElementById('memberEmployeeId').value = '';
+                populateGroupDropdown('');
+                document.getElementById('memberShowOnBoard').checked = true;
+                document.getElementById('memberNoAssignment').checked = false;
+                toggleNoAssignment();
                 document.getElementById('memberScheduleStart').value = 'Monday';
                 document.getElementById('memberScheduleEnd').value = 'Friday';
                 document.getElementById('memberTimeStart').value = '06:00';
@@ -2205,6 +2524,9 @@
                 ...(dispatchData[userId] || {}),
                 name: name,
                 trade: trade,
+                group: document.getElementById('memberGroup').value || '',
+                showOnTeamStatus: document.getElementById('memberShowOnBoard').checked,
+                noBuildingAssignment: document.getElementById('memberNoAssignment').checked,
                 scheduleStart: scheduleStart,
                 scheduleEnd: scheduleEnd,
                 scheduleTimeStart: scheduleTimeStart,
@@ -2281,7 +2603,7 @@
                         <div class="employee-meta" style="grid-template-columns: 1fr 1fr 1fr;">
                             <div class="meta-item">
                                 <div class="meta-label">Assignment</div>
-                                <div class="meta-value">${primary.length > 0 ? primary[0].building + (primary[0].floor ? ' - ' + primary[0].floor : '') + (primary.length > 1 ? ` +${primary.length - 1}` : '') : 'TBD'}</div>
+                                <div class="meta-value">${profile.noBuildingAssignment ? '<span style="color: var(--gray-600); font-style: italic;">No Assignment</span>' : (primary.length > 0 ? primary[0].building + (primary[0].floor ? ' - ' + primary[0].floor : '') + (primary.length > 1 ? ` +${primary.length - 1}` : '') : 'TBD')}</div>
                             </div>
                             <div class="meta-item">
                                 <div class="meta-label">Trade</div>
