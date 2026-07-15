@@ -1010,12 +1010,13 @@
         // Web app → SDK setup and configuration → Config
         // ============================================================
         const firebaseConfig = {
-            apiKey: "PASTE_YOUR_API_KEY",
-            authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-            projectId: "PASTE_YOUR_PROJECT_ID",
-            storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-            messagingSenderId: "PASTE_YOUR_SENDER_ID",
-            appId: "PASTE_YOUR_APP_ID"
+            apiKey: "AIzaSyC21uDcMLyGso3kLqBYimTL8loUi5zzLjw",
+            authDomain: "nova-quick.firebaseapp.com",
+            projectId: "nova-quick",
+            storageBucket: "nova-quick.firebasestorage.app",
+            messagingSenderId: "914595554926",
+            appId: "1:914595554926:web:e0edab2976d3b57a9aa87f",
+            measurementId: "G-XZDB76CP8P"
         };
     </script>
 
@@ -1080,9 +1081,13 @@
         }
 
         // Central save: updates local mirror AND pushes to cloud
+        let lastLocalWrite = {};  // key → timestamp, protects fresh local changes from stale cloud echoes
+        let cloudWriteErrorShown = false;
+
         function saveData(key, value) {
             setGlobal(key, value);
             localStorage.setItem(key, JSON.stringify(value));
+            lastLocalWrite[key] = Date.now();
             if (cloudReady) {
                 db.collection('jaxData').doc(key).set({
                     value: JSON.stringify(value),
@@ -1091,6 +1096,10 @@
                 }).catch(err => {
                     console.error('Cloud save failed for ' + key, err);
                     updateSyncBadge('error');
+                    if (!cloudWriteErrorShown) {
+                        cloudWriteErrorShown = true;
+                        alert('⚠️ Could not save to the cloud: ' + err.message + '\n\nYour change is saved on THIS device only. If this says "permission denied", Firestore is not in test mode or its rules are blocking writes.');
+                    }
                 });
             }
         }
@@ -1128,7 +1137,12 @@
                 snap.forEach(doc => {
                     seenKeys.add(doc.id);
                     try {
-                        const value = JSON.parse(doc.data().value);
+                        const docData = doc.data();
+                        // Skip stale cloud echoes that are older than a fresh local change
+                        if (lastLocalWrite[doc.id] && docData.updatedAt && docData.updatedAt < lastLocalWrite[doc.id]) {
+                            return;
+                        }
+                        const value = JSON.parse(docData.value);
                         if (applyCloudValue(doc.id, value)) changed = true;
                     } catch (e) {
                         console.error('Failed to parse cloud data for ' + doc.id, e);
@@ -2128,6 +2142,17 @@
             return assignments;
         }
 
+        function showToast(message) {
+            const existing = document.getElementById('jaxToast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'jaxToast';
+            toast.textContent = message;
+            toast.style.cssText = 'position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--gray-900); color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 6000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
         function saveMember() {
             const name = document.getElementById('memberName').value.trim();
             if (!name) {
@@ -2199,6 +2224,7 @@
             closeMemberModal();
             renderMainDispatchDashboard();
             renderUsersList();
+            showToast(`✓ ${name} saved${cloudReady ? ' and synced' : ' (this device only — cloud not connected)'}`);
         }
 
         function deleteMember(userId, event) {
