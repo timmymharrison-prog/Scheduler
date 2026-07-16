@@ -776,6 +776,9 @@
                         </div>
 
                         <!-- Employee List -->
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                            <button class="btn btn-secondary btn-small" id="compactToggleBtn" onclick="toggleCompactView()">Card Preview Mode</button>
+                        </div>
                         <div id="mainDispatchEmployeesList"></div>
                     </div>
 
@@ -1171,7 +1174,17 @@
             }
         }
 
+        const ARRAY_KEYS = ['users', 'requests', 'buildings', 'trades', 'groups', 'onSitePagerTrades', 'afterHoursOnCallTrades'];
         function applyCloudValue(key, value) {
+            // Guard against malformed cloud data replacing arrays/objects with the wrong type
+            if (ARRAY_KEYS.includes(key) && !Array.isArray(value)) {
+                console.error('Cloud data for "' + key + '" is not an array — ignoring.', value);
+                return false;
+            }
+            if (!ARRAY_KEYS.includes(key) && (typeof value !== 'object' || value === null || Array.isArray(value))) {
+                console.error('Cloud data for "' + key + '" is not an object — ignoring.', value);
+                return false;
+            }
             const current = JSON.stringify(getGlobal(key));
             const incoming = JSON.stringify(value);
             if (current === incoming) return false;
@@ -1446,6 +1459,8 @@
             populateTradeFilter();
             filterMainDispatchEmployees();
             renderGroupsPanel();
+            const compactBtn = document.getElementById('compactToggleBtn');
+            if (compactBtn) compactBtn.textContent = compactView ? 'Full Card Mode' : 'Card Preview Mode';
         }
 
         // ===== GROUPS =====
@@ -1927,7 +1942,34 @@
             });
 
             const container = document.getElementById('mainDispatchEmployeesList');
-            container.innerHTML = filtered.map(emp => renderEmployeeCard(emp)).join('');
+            if (!container) return;
+            if (compactView) {
+                container.innerHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${filtered.map(emp => {
+                            const dotColor = emp.status === 'working' ? 'var(--success)' : emp.status === 'pto' ? 'var(--warning)' : 'var(--error)';
+                            return `
+                                <div onclick="openEmployeeProfile(${emp.id})" style="display: inline-flex; align-items: center; gap: 8px; background: white; border: 1px solid var(--gray-300); border-radius: 16px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--gray-300)'">
+                                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${dotColor};"></span>
+                                    ${emp.name}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = filtered.map(emp => renderEmployeeCard(emp)).join('');
+            }
+        }
+
+        let compactView = localStorage.getItem('compactView') === '1';
+
+        function toggleCompactView() {
+            compactView = !compactView;
+            localStorage.setItem('compactView', compactView ? '1' : '0');
+            const btn = document.getElementById('compactToggleBtn');
+            if (btn) btn.textContent = compactView ? 'Full Card Mode' : 'Card Preview Mode';
+            filterMainDispatchEmployees();
         }
 
         function renderEmployeeCard(emp) {
@@ -2828,8 +2870,9 @@
             const container = document.getElementById('userManagementContent');
             if (!container) return;
 
+            try {
             const searchTerm = document.getElementById('userSearchInput')?.value?.toLowerCase() || '';
-            const filtered = users.filter(u => !searchTerm || u.name.toLowerCase().includes(searchTerm));
+            const filtered = (Array.isArray(users) ? users : []).filter(u => u && (!searchTerm || (u.name || '').toLowerCase().includes(searchTerm)));
 
             if (filtered.length === 0) {
                 container.innerHTML = `
@@ -2877,6 +2920,10 @@
                     </div>
                 `;
             }).join('');
+            } catch (err) {
+                console.error('renderUsersList failed:', err);
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Could not display team members</div><div class="empty-message">' + err.message + '</div></div>';
+            }
         }
     </script>
 </body>
