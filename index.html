@@ -761,17 +761,9 @@
                         <div id="teamStatsContainer"></div>
 
                         <!-- Search & Filters -->
-                        <div class="search-bar" style="grid-template-columns: 2fr 1fr 1fr 1fr auto;">
-                            <input type="text" class="search-input" placeholder="Search by name..." id="mainDispatchSearchInput" onkeyup="filterMainDispatchEmployees()">
-                            <select class="form-select" id="filterBuilding" onchange="updateFloorFilter(); filterMainDispatchEmployees()">
-                                <option value="">All Buildings</option>
-                            </select>
-                            <select class="form-select" id="filterFloor" onchange="filterMainDispatchEmployees()">
-                                <option value="">All Floors</option>
-                            </select>
-                            <select class="form-select" id="filterTrade" onchange="filterMainDispatchEmployees()">
-                                <option value="">All Trades</option>
-                            </select>
+                        <div id="locationToggles" style="margin-bottom: 16px;"></div>
+                        <div class="search-bar" style="grid-template-columns: 1fr auto;">
+                            <input type="text" class="search-input" placeholder="Search anything — name, trade, building, floor, status..." id="mainDispatchSearchInput" onkeyup="filterMainDispatchEmployees()">
                             <button class="btn btn-secondary" onclick="clearSearchFilters()" title="Clear all filters">✕ Clear</button>
                         </div>
 
@@ -1254,6 +1246,11 @@
             });
         }
 
+
+        function byName(a, b) {
+            return (a.name || '').localeCompare(b.name || '');
+        }
+
         function refreshCurrentView() {
             const active = document.querySelector('.section.active');
             if (!active) return;
@@ -1455,8 +1452,7 @@
             });
 
             updateTeamStats();
-            populateBuildingFilter();
-            populateTradeFilter();
+            renderLocationToggles();
             filterMainDispatchEmployees();
             renderGroupsPanel();
             const compactBtn = document.getElementById('compactToggleBtn');
@@ -1492,7 +1488,7 @@
                         ${activeGroupFilter ? `<button class="btn btn-secondary btn-small" onclick="setGroupFilter(null)">Clear filter</button>` : ''}
                     </div>
                     ${groups.map(g => {
-                        const members = dispatchEmployees.filter(e => e.group === g);
+                        const members = dispatchEmployees.filter(e => e.group === g).sort(byName);
                         const isActive = activeGroupFilter === g;
                         return `
                             <div style="margin-bottom: 14px;">
@@ -1512,12 +1508,66 @@
             `;
         }
 
+        let toggleBuilding = null;
+        let toggleFloor = null;
+
+        function renderLocationToggles() {
+            const container = document.getElementById('locationToggles');
+            if (!container) return;
+
+            const chip = (label, active, onclick, extra = '') => `
+                <button onclick="${onclick}" style="border: 1px solid ${active ? 'var(--primary)' : 'var(--gray-300)'}; background: ${active ? 'var(--primary)' : 'white'}; color: ${active ? 'white' : 'var(--gray-700)'}; padding: 7px 16px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; ${extra}">${label}</button>
+            `;
+
+            if (!toggleBuilding) {
+                // Building level
+                container.innerHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        ${chip('All', true, '')}
+                        ${buildings.map(b => chip(b.name, false, `setToggleBuilding('${b.name.replace(/'/g, "\\'")}')`)).join('')}
+                    </div>
+                `;
+            } else {
+                // Floor level within the selected building
+                const building = buildings.find(b => b.name === toggleBuilding);
+                const floors = building ? building.floors : [];
+                container.innerHTML = `
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        ${chip('← Back', false, 'backToBuildings()', 'font-weight: 600;')}
+                        <span style="font-size: 13px; font-weight: 600; color: var(--gray-900); padding: 0 4px;">${toggleBuilding}:</span>
+                        ${chip('All floors', !toggleFloor, "setToggleFloor(null)")}
+                        ${floors.map(f => chip(f, toggleFloor === f, `setToggleFloor('${f.replace(/'/g, "\\'")}')`)).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        function setToggleBuilding(name) {
+            toggleBuilding = name;
+            toggleFloor = null;
+            renderLocationToggles();
+            filterMainDispatchEmployees();
+        }
+
+        function setToggleFloor(name) {
+            toggleFloor = name;
+            renderLocationToggles();
+            filterMainDispatchEmployees();
+        }
+
+        function backToBuildings() {
+            toggleBuilding = null;
+            toggleFloor = null;
+            renderLocationToggles();
+            filterMainDispatchEmployees();
+        }
+
         function clearSearchFilters() {
             document.getElementById('mainDispatchSearchInput').value = '';
-            document.getElementById('filterBuilding').value = '';
-            document.getElementById('filterFloor').innerHTML = '<option value="">All Floors</option>';
-            document.getElementById('filterTrade').value = '';
+            toggleBuilding = null;
+            toggleFloor = null;
             activeGroupFilter = null;
+            renderLocationToggles();
             filterMainDispatchEmployees();
             renderGroupsPanel();
         }
@@ -1568,8 +1618,8 @@
 
             container.innerHTML = groups.map(g => {
                 const isOpen = openGroupName === g;
-                const members = users.filter(u => (dispatchData[u.id] || {}).group === g);
-                const nonMembers = users.filter(u => (dispatchData[u.id] || {}).group !== g);
+                const members = users.filter(u => (dispatchData[u.id] || {}).group === g).sort(byName);
+                const nonMembers = users.filter(u => (dispatchData[u.id] || {}).group !== g).sort(byName);
                 const escaped = g.replace(/'/g, "\\'");
 
                 return `
@@ -1901,9 +1951,6 @@
 
         function filterMainDispatchEmployees() {
             const searchTerm = document.getElementById('mainDispatchSearchInput')?.value?.toLowerCase() || '';
-            const buildingFilter = document.getElementById('filterBuilding')?.value || '';
-            const floorFilter = document.getElementById('filterFloor')?.value || '';
-            const tradeFilter = document.getElementById('filterTrade')?.value || '';
 
             dispatchEmployees.forEach(emp => {
                 emp.status = calculateEmployeeStatus(emp.id);
@@ -1916,30 +1963,35 @@
                 // Group panel filter
                 if (activeGroupFilter && emp.group !== activeGroupFilter) return false;
 
-                const matchesSearch = !searchTerm || emp.name.toLowerCase().includes(searchTerm);
-
-                let matchesBuilding = !buildingFilter;
-                if (buildingFilter) {
-                    const primaryAssignments = getPrimaryAssignments(emp);
-                    const backupAssignments = getBackupAssignments(emp);
-                    const hasPrimaryBuilding = primaryAssignments.some(a => a.building === buildingFilter);
-                    const hasBackupBuilding = backupAssignments.some(a => a.building === buildingFilter);
-                    matchesBuilding = hasPrimaryBuilding || hasBackupBuilding;
+                // Location toggles — filter by place only, ALL statuses included
+                if (toggleBuilding) {
+                    const pa = getPrimaryAssignments(emp);
+                    const ba = getBackupAssignments(emp);
+                    const inBuilding = pa.some(a => a.building === toggleBuilding) || ba.some(a => a.building === toggleBuilding);
+                    if (!inBuilding) return false;
+                    if (toggleFloor) {
+                        const onFloor = pa.some(a => a.building === toggleBuilding && a.floor === toggleFloor) ||
+                                        ba.some(a => a.building === toggleBuilding && a.floor === toggleFloor);
+                        if (!onFloor) return false;
+                    }
                 }
 
-                let matchesFloor = !floorFilter;
-                if (floorFilter && buildingFilter) {
-                    const primaryAssignments = getPrimaryAssignments(emp);
-                    const backupAssignments = getBackupAssignments(emp);
-                    const hasPrimaryFloor = primaryAssignments.some(a => a.building === buildingFilter && a.floor === floorFilter);
-                    const hasBackupFloor = backupAssignments.some(a => a.building === buildingFilter && a.floor === floorFilter);
-                    matchesFloor = hasPrimaryFloor || hasBackupFloor;
+                // Global search across everything shown on the card
+                if (searchTerm) {
+                    const statusText = emp.status === 'pto' ? 'off duty' : emp.status === 'working' ? 'working' : 'off shift';
+                    const haystack = [
+                        emp.name, emp.role, emp.trade || 'General', emp.group || '', statusText,
+                        emp.noBuildingAssignment ? 'no assignment' : '',
+                        ...getPrimaryAssignments(emp).map(a => a.building + ' ' + (a.floor || '')),
+                        ...getBackupAssignments(emp).map(a => a.building + ' ' + (a.floor || ''))
+                    ].join(' ').toLowerCase();
+                    if (!haystack.includes(searchTerm)) return false;
                 }
 
-                const matchesTrade = !tradeFilter || emp.trade === tradeFilter;
-
-                return matchesSearch && matchesBuilding && matchesFloor && matchesTrade;
+                return true;
             });
+
+            filtered.sort(byName);
 
             const container = document.getElementById('mainDispatchEmployeesList');
             if (!container) return;
@@ -2048,7 +2100,7 @@
             dispatchEmployees.forEach(emp => {
                 emp.status = calculateEmployeeStatus(emp.id);
             });
-            const matching = dispatchEmployees.filter(e => e.status === status && e.showOnTeamStatus !== false);
+            const matching = dispatchEmployees.filter(e => e.status === status && e.showOnTeamStatus !== false).sort(byName);
 
             const body = document.getElementById('statusModalBody');
             if (matching.length === 0) {
@@ -2343,7 +2395,7 @@
             }
 
             const userOptions = (selectedId) => '<option value="">Unassigned</option>' +
-                users.map(u => `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${u.name}</option>`).join('');
+                [...users].sort(byName).map(u => `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${u.name}</option>`).join('');
 
             body.innerHTML = config.tradeList.map(trade => {
                 const safeId = trade.replace(/[^a-zA-Z0-9]/g, '');
@@ -2872,7 +2924,7 @@
 
             try {
             const searchTerm = document.getElementById('userSearchInput')?.value?.toLowerCase() || '';
-            const filtered = (Array.isArray(users) ? users : []).filter(u => u && (!searchTerm || (u.name || '').toLowerCase().includes(searchTerm)));
+            const filtered = (Array.isArray(users) ? users : []).filter(u => u && (!searchTerm || (u.name || '').toLowerCase().includes(searchTerm))).sort(byName);
 
             if (filtered.length === 0) {
                 container.innerHTML = `
