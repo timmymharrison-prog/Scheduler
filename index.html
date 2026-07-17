@@ -1524,7 +1524,7 @@
                 container.innerHTML = `
                     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                         ${chip('All', true, '')}
-                        ${buildings.map(b => chip(b.name, false, `setToggleBuilding('${b.name.replace(/'/g, "\\'")}')`)).join('')}
+                        ${[...buildings].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(b => chip(b.name, false, `setToggleBuilding('${b.name.replace(/'/g, "\\'")}')`)).join('')}
                     </div>
                 `;
             } else {
@@ -2150,30 +2150,60 @@
             document.getElementById('buildingsModal').classList.add('active');
         }
 
+        let openBuildingName = null;
+
         function renderBuildingsList() {
             const container = document.getElementById('buildingsList');
             if (buildings.length === 0) {
                 container.innerHTML = '<div style="color: var(--gray-600); font-style: italic; text-align: center; padding: 20px;">No buildings yet. Add one above.</div>';
                 return;
             }
-            container.innerHTML = buildings.map((b, bIdx) => `
-                <div style="border: 1px solid var(--gray-300); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <div style="font-weight: 600;">${b.name}</div>
-                        <button class="btn btn-secondary btn-small" onclick="deleteBuilding(${bIdx})">Delete</button>
-                    </div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                        <input type="text" class="form-input" id="newFloor_${bIdx}" placeholder="New floor name..." onkeydown="if(event.key==='Enter') addFloor(${bIdx})">
-                        <button class="btn btn-secondary btn-small" onclick="addFloor(${bIdx})">Add Floor</button>
-                    </div>
-                    ${b.floors.map((f, fIdx) => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--gray-50); border-radius: 6px; margin-bottom: 6px;">
-                            <span style="font-size: 14px;">${f}</span>
-                            <button class="btn btn-secondary btn-small" onclick="deleteFloor(${bIdx}, ${fIdx})">✕</button>
+            container.innerHTML = buildings.map((b, bIdx) => {
+                const isOpen = openBuildingName === b.name;
+                const escaped = b.name.replace(/'/g, "\\'");
+                return `
+                <div style="border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
+                    <div onclick="toggleBuildingOpen('${escaped}')" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; background: ${isOpen ? 'var(--gray-50)' : 'white'};">
+                        <div style="font-weight: 600;">${b.name} <span style="font-weight: 400; color: var(--gray-600); font-size: 13px;">(${b.floors.length} floor${b.floors.length === 1 ? '' : 's'})</span></div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); deleteBuilding(${bIdx})">Delete</button>
+                            <span style="color: var(--gray-600);">${isOpen ? '▲' : '▼'}</span>
                         </div>
-                    `).join('')}
+                    </div>
+                    ${isOpen ? `
+                        <div style="padding: 16px; border-top: 1px solid var(--gray-300);">
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                <input type="text" class="form-input" id="newFloor_${bIdx}" placeholder="New floor name..." onkeydown="if(event.key==='Enter') addFloor(${bIdx})">
+                                <button class="btn btn-secondary btn-small" onclick="addFloor(${bIdx})">Add Floor</button>
+                            </div>
+                            ${b.floors.map((f, fIdx) => `
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--gray-50); border-radius: 6px; margin-bottom: 6px;">
+                                    <span style="font-size: 14px;">${f}</span>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="btn btn-secondary btn-small" ${fIdx === 0 ? 'disabled style="opacity: 0.3;"' : ''} onclick="moveFloor(${bIdx}, ${fIdx}, -1)" title="Move up">↑</button>
+                                        <button class="btn btn-secondary btn-small" ${fIdx === b.floors.length - 1 ? 'disabled style="opacity: 0.3;"' : ''} onclick="moveFloor(${bIdx}, ${fIdx}, 1)" title="Move down">↓</button>
+                                        <button class="btn btn-secondary btn-small" onclick="deleteFloor(${bIdx}, ${fIdx})">✕</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
                 </div>
-            `).join('');
+            `;}).join('');
+        }
+
+        function toggleBuildingOpen(name) {
+            openBuildingName = openBuildingName === name ? null : name;
+            renderBuildingsList();
+        }
+
+        function moveFloor(bIdx, fIdx, dir) {
+            const floors = buildings[bIdx].floors;
+            const target = fIdx + dir;
+            if (target < 0 || target >= floors.length) return;
+            [floors[fIdx], floors[target]] = [floors[target], floors[fIdx]];
+            saveBuildingsData();
+            renderBuildingsList();
         }
 
         function addBuilding() {
@@ -2185,9 +2215,12 @@
                 return;
             }
             buildings.push({ name: name, description: '', floors: [] });
+            buildings.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             saveBuildingsData();
             input.value = '';
+            openBuildingName = name;
             renderBuildingsList();
+            renderLocationToggles();
         }
 
         function deleteBuilding(idx) {
@@ -2761,7 +2794,7 @@
             row.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; margin-bottom: 12px; align-items: end;';
 
             const buildingOptions = '<option value="">Select building...</option>' + 
-                buildings.map(b => `<option value="${b.name}" ${b.name === selectedBuilding ? 'selected' : ''}>${b.name}</option>`).join('');
+                [...buildings].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(b => `<option value="${b.name}" ${b.name === selectedBuilding ? 'selected' : ''}>${b.name}</option>`).join('');
 
             row.innerHTML = `
                 <div>
